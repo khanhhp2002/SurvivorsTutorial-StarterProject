@@ -1,7 +1,9 @@
+using System.Linq.Expressions;
 using Unity.Burst;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Physics;
+using Unity.Rendering;
 using UnityEngine;
 
 public class CharacterAuthoring : MonoBehaviour
@@ -17,6 +19,7 @@ public class CharacterAuthoring : MonoBehaviour
             AddComponent<InitializedCharacterFlag>(entity);
             AddComponent<CharacterMoveDirection>(entity);
             AddComponent(entity, new CharacterMoveSpeed { Value = authoring.MoveSpeed });
+            AddComponent(entity, new FacingDirectionOverride { Value = 1f });
         }
     }
 }
@@ -33,16 +36,34 @@ public struct CharacterMoveSpeed : IComponentData
     public float Value;
 }
 
+[MaterialProperty("_FacingDirection")]
+public struct FacingDirectionOverride : IComponentData
+{
+    public float Value;
+}
+
 public partial struct CharacterMoveSystem : ISystem
 {
     [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
-        foreach (var (moveDirection, moveSpeed, velocity) in
-                 SystemAPI.Query<CharacterMoveDirection, CharacterMoveSpeed, RefRW<PhysicsVelocity>>())
+        foreach (var (moveDirection, moveSpeed, velocity, facingDirection,entity) in
+                 SystemAPI.Query<CharacterMoveDirection, CharacterMoveSpeed, RefRW<PhysicsVelocity>, RefRW<FacingDirectionOverride>>()
+                 .WithEntityAccess())
         {
             float2 moveStep2d = moveDirection.Value * moveSpeed.Value;
             velocity.ValueRW.Linear = new float3(moveStep2d, 0f);
+
+            if(math.abs(moveStep2d.x) > 0.15f)
+            {
+                facingDirection.ValueRW.Value = math.sign(moveStep2d.x);
+            }
+
+            if(SystemAPI.HasComponent<PlayerTag>(entity))
+            {
+               var animationOverride = SystemAPI.GetComponentRW<AnimationIndexOverride>(entity);
+               animationOverride.ValueRW.Value = math.lengthsq(moveStep2d) > float.Epsilon ? (float)PlayerAnimationIndex.Movement : (float)PlayerAnimationIndex.Idle;
+            }
         }
     }
 }

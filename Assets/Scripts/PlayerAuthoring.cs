@@ -1,6 +1,7 @@
 using Unity.Burst;
 using Unity.Entities;
 using Unity.Mathematics;
+using Unity.Rendering;
 using Unity.Transforms;
 using UnityEngine;
 
@@ -16,8 +17,15 @@ public class PlayerAuthoring : MonoBehaviour
             AddComponent<PlayerTag>(entity);
             AddComponent<InitialCameraTargetTag>(entity);
             AddComponent<CameraTarget>(entity);
+            AddComponent<AnimationIndexOverride>(entity, new AnimationIndexOverride { Value = (float)PlayerAnimationIndex.Idle });
         }
     }
+}
+
+[MaterialProperty("_AnimationIndex")]
+public struct AnimationIndexOverride : IComponentData
+{
+    public float Value;
 }
 
 public struct PlayerTag : IComponentData { }
@@ -72,6 +80,20 @@ public partial struct MoveCameraSystem : ISystem
         }
     }
 }
+public partial struct GlobalTimeUpdateSystem : ISystem
+{
+    private static int _globalTimeShaderPropertyID;
+    public void OnCreate(ref SystemState state)
+    {
+        _globalTimeShaderPropertyID = Shader.PropertyToID("_GlobalTime");
+    }
+
+    public void OnUpdate(ref SystemState state)
+    {
+        float globalTime = (float)SystemAPI.Time.ElapsedTime;
+        Shader.SetGlobalFloat(_globalTimeShaderPropertyID, globalTime);
+    }
+}
 public partial class PlayerInputSystem : SystemBase
 {
     private SurvivorsInput _input;
@@ -93,4 +115,11 @@ public partial class PlayerInputSystem : SystemBase
             moveDirection.ValueRW.Value = currentInput;
         }
     }
+}
+
+public enum PlayerAnimationIndex : byte
+{
+   Movement = 0,
+   Idle = 1,
+   None = byte.MaxValue
 }
