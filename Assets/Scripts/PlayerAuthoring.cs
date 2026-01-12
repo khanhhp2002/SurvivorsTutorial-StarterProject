@@ -1,6 +1,7 @@
 using Unity.Burst;
 using Unity.Entities;
 using Unity.Mathematics;
+using Unity.Transforms;
 using UnityEngine;
 
 public class PlayerAuthoring : MonoBehaviour
@@ -12,12 +13,65 @@ public class PlayerAuthoring : MonoBehaviour
             var entity = GetEntity(TransformUsageFlags.Dynamic);
 
             // Add components to the entity
-            AddComponent<PLayerTag>(entity);
+            AddComponent<PlayerTag>(entity);
+            AddComponent<InitialCameraTargetTag>(entity);
+            AddComponent<CameraTarget>(entity);
         }
     }
 }
 
-public struct PLayerTag : IComponentData { }
+public struct PlayerTag : IComponentData { }
+public struct InitialCameraTargetTag : IComponentData { }
+public struct CameraTarget : IComponentData
+{
+    public UnityObjectRef<Transform> CameraTransform;
+}
+
+[UpdateInGroup(typeof(InitializationSystemGroup))]
+public partial struct CameraInitializationSystem : ISystem
+{
+    public void OnCreate(ref SystemState state)
+    {
+        state.RequireForUpdate<InitialCameraTargetTag>();
+    }
+
+    public void OnUpdate(ref SystemState state)
+    {
+        if (!CameraTargetSingleton.Instance)
+            return;
+
+        var cameraTransform = CameraTargetSingleton.Instance.transform;
+
+        var ecb = new EntityCommandBuffer(state.WorldUpdateAllocator);
+
+        foreach (var (cameraTarget, entity) in
+                 SystemAPI.Query<RefRW<CameraTarget>>()
+                 .WithAll<InitialCameraTargetTag, PlayerTag>()
+                 .WithEntityAccess())
+        {
+            cameraTarget.ValueRW.CameraTransform = cameraTransform;
+            ecb.RemoveComponent<InitialCameraTargetTag>(entity);
+        }
+
+        ecb.Playback(state.EntityManager);
+        ecb.Dispose();
+    }
+}
+
+[UpdateAfter(typeof(TransformSystemGroup))]
+public partial struct MoveCameraSystem : ISystem
+{
+    public void OnUpdate(ref SystemState state)
+    {
+        foreach (var (transform, cameraTarget) in
+                 SystemAPI.Query<LocalToWorld, CameraTarget>()
+                 .WithAll<PlayerTag>()
+                 .WithNone<InitialCameraTargetTag>())
+        {
+            cameraTarget.CameraTransform.Value.position = transform.Position;
+        }
+    }
+}
 public partial class PlayerInputSystem : SystemBase
 {
     private SurvivorsInput _input;
@@ -34,7 +88,7 @@ public partial class PlayerInputSystem : SystemBase
         var currentInput = (float2)_input.Player.Move.ReadValue<Vector2>();
         foreach (var moveDirection in
                  SystemAPI.Query<RefRW<CharacterMoveDirection>>()
-                 .WithAll<PLayerTag>())
+                 .WithAll<PlayerTag>())
         {
             moveDirection.ValueRW.Value = currentInput;
         }
