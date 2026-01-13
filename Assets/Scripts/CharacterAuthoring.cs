@@ -1,4 +1,3 @@
-using System.Linq.Expressions;
 using Unity.Burst;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -9,6 +8,7 @@ using UnityEngine;
 public class CharacterAuthoring : MonoBehaviour
 {
     public float MoveSpeed;
+    public float MaxHitPoints;
     private class Baker : Baker<CharacterAuthoring>
     {
         public override void Bake(CharacterAuthoring authoring)
@@ -20,8 +20,26 @@ public class CharacterAuthoring : MonoBehaviour
             AddComponent<CharacterMoveDirection>(entity);
             AddComponent(entity, new CharacterMoveSpeed { Value = authoring.MoveSpeed });
             AddComponent(entity, new FacingDirectionOverride { Value = 1f });
+            AddComponent(entity, new CharacterMaxHitPoints { Value = authoring.MaxHitPoints });
+            AddComponent(entity, new CharacterCurrentHitPoints { Value = authoring.MaxHitPoints });
+            AddBuffer<DamageThisFrame>(entity);
         }
     }
+}
+
+public struct CharacterMaxHitPoints : IComponentData
+{
+    public float Value;
+}
+
+public struct CharacterCurrentHitPoints : IComponentData
+{
+    public float Value;
+}
+
+public struct DamageThisFrame : IBufferElementData
+{
+    public float Value;
 }
 
 public struct InitializedCharacterFlag : IComponentData, IEnableableComponent { }
@@ -80,6 +98,29 @@ public partial struct CharacterInitializationSystem : ISystem
             // No rotation for characters
             mass.ValueRW.InverseInertia = float3.zero;
             shouldInitialize.ValueRW = false;
+        }
+    }
+}
+
+public partial struct ProcessDamageThisFrameSystem : ISystem
+{
+    [BurstCompile]
+    public void OnUpdate(ref SystemState state)
+    {
+        foreach (var (currentHitPoints, damageBuffer) in
+                 SystemAPI.Query<RefRW<CharacterCurrentHitPoints>, DynamicBuffer<DamageThisFrame>>())
+        {
+            if(damageBuffer.IsEmpty)
+                continue;
+                
+            float totalDamage = 0f;
+            for (int i = 0; i < damageBuffer.Length; i++)
+            {
+                totalDamage += damageBuffer[i].Value;
+            }
+
+            currentHitPoints.ValueRW.Value -= totalDamage;
+            damageBuffer.Clear();
         }
     }
 }

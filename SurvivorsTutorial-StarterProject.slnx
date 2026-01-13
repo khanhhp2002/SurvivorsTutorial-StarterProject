@@ -9,8 +9,8 @@
   <Project Path="Unity.Cinemachine.Editor.csproj" />
   <Project Path="Unity.Collections.csproj" />
   <Project Path="Unity.Entities.UI.Editor.csproj" />
-  <Project Path="Unity.PerformanceTesting.Editor.csproj" />
   <Project Path="Unity.Splines.csproj" />
+  <Project Path="Unity.PerformanceTesting.Editor.csproj" />
   <Project Path="Unity.Burst.csproj" />
   <Project Path="Unity.InputSystem.csproj" />
   <Project Path="Unity.VisualStudio.Editor.csproj" />
@@ -21,9 +21,9 @@
   <Project Path="Unity.InternalAPIEngineBridge.002.csproj" />
   <Project Path="Unity.CollabProxy.Editor.csproj" />
   <Project Path="Unity.AI.Navigation.Editor.ConversionSystem.csproj" />
+  <Project Path="Unity.Cinemachine.csproj" />
   <Project Path="Unity.Physics.Hybrid.csproj" />
   <Project Path="Unity.Burst.CodeGen.csproj" />
-  <Project Path="Unity.Cinemachine.csproj" />
   <Project Path="Unity.Splines.Editor.csproj" />
   <Project Path="Unity.Entities.Hybrid.csproj" />
   <Project Path="Unity.PerformanceTesting.csproj" />

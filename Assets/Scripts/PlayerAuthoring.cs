@@ -5,6 +5,7 @@ using Unity.Rendering;
 using Unity.Transforms;
 using UnityEngine;
 
+[RequireComponent(typeof(CharacterAuthoring))]
 public class PlayerAuthoring : MonoBehaviour
 {
     private class Baker : Baker<PlayerAuthoring>
@@ -17,7 +18,7 @@ public class PlayerAuthoring : MonoBehaviour
             AddComponent<PlayerTag>(entity);
             AddComponent<InitialCameraTargetTag>(entity);
             AddComponent<CameraTarget>(entity);
-            AddComponent<AnimationIndexOverride>(entity, new AnimationIndexOverride { Value = (float)PlayerAnimationIndex.Idle });
+            AddComponent(entity, new AnimationIndexOverride { Value = (float)PlayerAnimationIndex.Idle });
         }
     }
 }
