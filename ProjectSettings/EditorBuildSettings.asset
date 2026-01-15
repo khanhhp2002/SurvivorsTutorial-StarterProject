@@ -9,7 +9,7 @@ EditorBuildSettings:
     path: Assets/Scenes/TitleScene.unity
     guid: 2746338859879314ca8bbfcc803bd124
   - enabled: 1
-    path: Assets/Scenes/MoonLevel.unity
+    path: Assets/Scenes/MoonLevel/MoonLevel.unity
     guid: 2edbc931b9a1abe4ab5c0ec346f33c3b
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}

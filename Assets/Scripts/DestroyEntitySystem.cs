@@ -6,13 +6,11 @@ using Unity.Entities;
 [UpdateBefore(typeof(EndSimulationEntityCommandBufferSystem))]
 public partial struct DestroyEntitySystem : ISystem
 {
-    [BurstCompile]
     public void OnCreate(ref SystemState state)
     {
         state.RequireForUpdate<EndSimulationEntityCommandBufferSystem.Singleton>();
     }
 
-    [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
         var endEcb = SystemAPI.GetSingleton<EndSimulationEntityCommandBufferSystem.Singleton>();
@@ -22,7 +20,7 @@ public partial struct DestroyEntitySystem : ISystem
                  SystemAPI.Query<DestroyEntityFlag>()
                  .WithEntityAccess())
         {
-            if(SystemAPI.HasComponent<PlayerTag>(entity))
+            if (SystemAPI.HasComponent<PlayerTag>(entity))
             {
                 GameUIController.Instance.ShowGameOverUI();
             }
@@ -37,4 +35,4 @@ public partial struct DestroyEntitySystem : ISystem
     }
 }
 
-public struct DestroyEntityFlag : IComponentData, IEnableableComponent{}
+public struct DestroyEntityFlag : IComponentData, IEnableableComponent { }

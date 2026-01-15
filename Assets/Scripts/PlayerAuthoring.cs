@@ -1,6 +1,8 @@
 using Unity.Burst;
+using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
+using Unity.Physics;
 using Unity.Rendering;
 using Unity.Transforms;
 using UnityEngine;
@@ -8,6 +10,9 @@ using UnityEngine;
 [RequireComponent(typeof(CharacterAuthoring))]
 public class PlayerAuthoring : MonoBehaviour
 {
+    [SerializeField] private GameObject attackPrefab;
+    [SerializeField] private float attackCooldown = 0.5f;
+    [SerializeField] private float detectionSize;
     private class Baker : Baker<PlayerAuthoring>
     {
         public override void Bake(PlayerAuthoring authoring)
@@ -19,6 +24,22 @@ public class PlayerAuthoring : MonoBehaviour
             AddComponent<InitialCameraTargetTag>(entity);
             AddComponent<CameraTarget>(entity);
             AddComponent(entity, new AnimationIndexOverride { Value = (float)PlayerAnimationIndex.Idle });
+
+            var enemyLayer = LayerMask.NameToLayer("Enemy");
+            var enemyLayerMask = (uint)math.pow(2, enemyLayer);
+            var attackCollisionFilter = new CollisionFilter
+            {
+                BelongsTo = uint.MaxValue,
+                CollidesWith = enemyLayerMask,
+            };
+            AddComponent(entity, new PlayerAttackData
+            {
+                AttackPrefab = GetEntity(authoring.attackPrefab, TransformUsageFlags.Dynamic),
+                AttackCooldown = authoring.attackCooldown,
+                DetectionSize = new float3(authoring.detectionSize),
+                Filter = attackCollisionFilter
+            });
+            AddComponent(entity, new PlayerAttackCooldown { value = 0 });
         }
     }
 }
@@ -27,6 +48,19 @@ public class PlayerAuthoring : MonoBehaviour
 public struct AnimationIndexOverride : IComponentData
 {
     public float Value;
+}
+
+public struct PlayerAttackData : IComponentData
+{
+    public Entity AttackPrefab;
+    public float AttackCooldown;
+    public float3 DetectionSize;
+    public CollisionFilter Filter;
+}
+
+public struct PlayerAttackCooldown : IComponentData
+{
+    public double value;
 }
 
 public struct PlayerTag : IComponentData { }
@@ -118,9 +152,85 @@ public partial class PlayerInputSystem : SystemBase
     }
 }
 
+public partial struct PlayerAttackSystem : ISystem
+{
+    public void OnCreate(ref SystemState state)
+    {
+        state.RequireForUpdate<BeginInitializationEntityCommandBufferSystem.Singleton>();
+        state.RequireForUpdate<EnemyTag>();
+    }
+
+    [BurstCompile]
+    public void OnUpdate(ref SystemState state)
+    {
+        var elapsedTime = SystemAPI.Time.ElapsedTime;
+
+        var ecb = SystemAPI.GetSingleton<BeginInitializationEntityCommandBufferSystem.Singleton>()
+            .CreateCommandBuffer(state.WorldUnmanaged);
+
+        var physicWorldSingleton = SystemAPI.GetSingleton<PhysicsWorldSingleton>();
+
+        foreach (var (attackData, cooldown, transform) in
+                 SystemAPI.Query<PlayerAttackData, RefRW<PlayerAttackCooldown>, LocalTransform>()
+                 .WithAll<PlayerTag>())
+        {
+            if (elapsedTime < cooldown.ValueRW.value)
+                continue;
+
+            // Instantiate attack entity
+            var attackEntity = ecb.Instantiate(attackData.AttackPrefab);
+
+            // Perform overlap check to find closest enemy
+            var minDetectionPos = transform.Position - attackData.DetectionSize;
+            var maxDetectionPos = transform.Position + attackData.DetectionSize;
+
+            var aabb = new OverlapAabbInput
+            {
+                Aabb = new Unity.Physics.Aabb
+                {
+                    Min = minDetectionPos,
+                    Max = maxDetectionPos
+                },
+                Filter = attackData.Filter
+            };
+
+            var overlapResults = new NativeList<int>(state.WorldUpdateAllocator);
+
+            if (!physicWorldSingleton.OverlapAabb(aabb, ref overlapResults))
+            {
+                continue;
+            }
+
+            var minDistance = float.MaxValue;
+            var closestEnemyPos = float3.zero;
+            foreach (var colliderKey in overlapResults)
+            {
+                var bodyPos = physicWorldSingleton.Bodies[colliderKey].WorldFromBody.pos;
+                var distance = math.distancesq(transform.Position, bodyPos);
+
+                if (distance < minDistance)
+                {
+                    minDistance = distance;
+                    closestEnemyPos = bodyPos;
+                }
+            }
+
+            //Direct the attack entity towards the closest enemy
+            var direction = math.normalize(closestEnemyPos - transform.Position);
+            var angle = math.atan2(direction.y, direction.x);
+            var rotation = quaternion.Euler(0, 0, angle);
+
+            // Set the position and rotation of the attack entity
+            ecb.SetComponent(attackEntity, LocalTransform.FromPositionRotation(transform.Position, rotation));
+
+            // Update cooldown
+            cooldown.ValueRW.value = elapsedTime + attackData.AttackCooldown;
+        }
+    }
+}
 public enum PlayerAnimationIndex : byte
 {
-   Movement = 0,
-   Idle = 1,
-   None = byte.MaxValue
+    Movement = 0,
+    Idle = 1,
+    None = byte.MaxValue
 }

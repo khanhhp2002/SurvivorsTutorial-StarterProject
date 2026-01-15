@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using Unity.Burst;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -147,7 +146,7 @@ public struct EnemyAttackJob : ICollisionEventsJob
         }
 
         // Enemy still in cooldown
-        if(EnemyCooldownTimerLookup.IsComponentEnabled(enemyEntity)) return;
+        if (EnemyCooldownTimerLookup.IsComponentEnabled(enemyEntity)) return;
 
         var attackData = EnemyAttackDataLookup[enemyEntity];
 
